@@ -31,9 +31,6 @@ pipeline {
 
     stages {
         stage('Build') {
-            options {
-                timeout(time: 6, unit: 'MINUTES')
-            }
             steps {
                 echo 'Dependencies install ho rahi hain...'
                 script {
@@ -42,8 +39,8 @@ pipeline {
                     } else {
                         run('python -m venv .venv')
                     }
-                    // Timeout aur retries: network atke to build hamesha ke liye latki na rahe
-                    run("${venvPython()} -m pip install --disable-pip-version-check --default-timeout=60 --retries 5 -r requirements.txt")
+                    run("${venvPython()} -m pip install --upgrade pip")
+                    run("${venvPython()} -m pip install -r requirements.txt")
                     run("${venvPython()} -m py_compile app.py")
                 }
             }

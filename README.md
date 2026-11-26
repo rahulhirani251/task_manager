@@ -6,7 +6,8 @@ Chhoti Python web application jisme Jenkins pipeline (Build -> Test -> Deploy) l
 
 | Method | Route | Kaam |
 |--------|-------|------|
-| GET | `/` | Welcome message aur environment |
+| GET | `/` | Web page (frontend) |
+| GET | `/api/info` | Welcome message aur environment (JSON) |
 | GET | `/health` | Health check |
 | GET | `/api/tasks` | Saare tasks |
 | POST | `/api/tasks` | Naya task (`{"title": "..."}`) |

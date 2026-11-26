@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
 
@@ -11,6 +11,11 @@ next_id = 1
 
 @app.route("/")
 def home():
+    return render_template("index.html")
+
+
+@app.route("/api/info")
+def info():
     return jsonify(
         message="Task Manager API chal rahi hai",
         env=os.environ.get("APP_ENV", "development"),

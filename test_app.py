@@ -12,8 +12,14 @@ def client():
         yield c
 
 
-def test_home(client):
+def test_home_page(client):
     res = client.get("/")
+    assert res.status_code == 200
+    assert b"Task Manager" in res.data
+
+
+def test_info(client):
+    res = client.get("/api/info")
     assert res.status_code == 200
     assert "message" in res.get_json()
 

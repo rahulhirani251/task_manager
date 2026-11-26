@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task Manager</title>
+  <style>
+    :root {
+      --bg: #f4f6fb; --card: #ffffff; --text: #1f2937; --muted: #6b7280;
+      --accent: #4f46e5; --accent-dark: #4338ca; --danger: #dc2626; --border: #e5e7eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      display: flex; justify-content: center; padding: 40px 16px;
+    }
+    .card {
+      width: 100%; max-width: 520px; background: var(--card); border-radius: 14px;
+      padding: 28px; box-shadow: 0 10px 30px rgba(17, 24, 39, 0.08); align-self: flex-start;
+    }
+    h1 { margin: 0 0 4px; font-size: 1.6rem; }
+    .sub { margin: 0 0 20px; color: var(--muted); font-size: 0.9rem; }
+    form { display: flex; gap: 8px; margin-bottom: 18px; }
+    input[type=text] {
+      flex: 1; padding: 11px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-size: 1rem; outline: none;
+    }
+    input[type=text]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
+    button.add {
+      background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+      padding: 0 18px; font-size: 1rem; cursor: pointer;
+    }
+    button.add:hover { background: var(--accent-dark); }
+    ul { list-style: none; margin: 0; padding: 0; }
+    li {
+      display: flex; align-items: center; gap: 10px; padding: 11px 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    li:last-child { border-bottom: 0; }
+    li span { flex: 1; word-break: break-word; }
+    li.done span { text-decoration: line-through; color: var(--muted); }
+    li input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent); }
+    button.del {
+      background: none; border: 0; color: var(--danger); cursor: pointer;
+      font-size: 0.9rem; padding: 4px 8px; border-radius: 6px;
+    }
+    button.del:hover { background: #fee2e2; }
+    .empty { text-align: center; color: var(--muted); padding: 24px 0; }
+    .error { color: var(--danger); font-size: 0.9rem; min-height: 1.2em; margin: -8px 0 10px; }
+    .footer { margin-top: 20px; font-size: 0.8rem; color: var(--muted); display: flex; justify-content: space-between; }
+    .badge {
+      background: #eef2ff; color: var(--accent); padding: 2px 8px; border-radius: 999px; font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Task Manager</h1>
+    <p class="sub" id="count">Loading...</p>
+
+    <form id="form">
+      <input type="text" id="title" placeholder="Add New Task..." autocomplete="off" maxlength="120">
+      <button class="add" type="submit">Add</button>
+    </form>
+    <div class="error" id="error"></div>
+
+    <ul id="list"></ul>
+
+    <div class="footer">
+      <span>Flask + Jenkins CI/CD</span>
+      <span>Environment: <span class="badge" id="env">...</span></span>
+    </div>
+  </main>
+
+  <script>
+    const list = document.getElementById("list");
+    const form = document.getElementById("form");
+    const titleInput = document.getElementById("title");
+    const errorBox = document.getElementById("error");
+    const countEl = document.getElementById("count");
+
+    async function api(path, options) {
+      const res = await fetch(path, options);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Some error occurred");
+      return data;
+    }
+
+    function render(tasks) {
+      list.innerHTML = "";
+      if (tasks.length === 0) {
+        list.innerHTML = '<li class="empty" style="justify-content:center">No tasks available</li>';
+      }
+      for (const t of tasks) {
+        const li = document.createElement("li");
+        if (t.done) li.className = "done";
+
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = t.done;
+        cb.addEventListener("change", () => toggle(t.id));
+
+        const span = document.createElement("span");
+        span.textContent = t.title; // textContent => XSS se safe
+
+        const del = document.createElement("button");
+        del.className = "del";
+        del.textContent = "Delete";
+        del.addEventListener("click", () => remove(t.id));
+
+        li.append(cb, span, del);
+        list.appendChild(li);
+      }
+      const done = tasks.filter(t => t.done).length;
+      countEl.textContent = tasks.length
+        ? done + " / " + tasks.length + " tasks complete"
+        : "Add your first task";
+    }
+
+    async function load() {
+      try { render(await api("/api/tasks")); }
+      catch (e) { errorBox.textContent = e.message; }
+    }
+
+    async function toggle(id) {
+      try { await api("/api/tasks/" + id, { method: "PUT" }); load(); }
+      catch (e) { errorBox.textContent = e.message; }
+    }
+
+    async function remove(id) {
+      try { await api("/api/tasks/" + id, { method: "DELETE" }); load(); }
+      catch (e) { errorBox.textContent = e.message; }
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorBox.textContent = "";
+      try {
+        await api("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: titleInput.value })
+        });
+        titleInput.value = "";
+        load();
+      } catch (err) { errorBox.textContent = err.message; }
+    });
+
+    api("/api/info").then(d => { document.getElementById("env").textContent = d.env; }).catch(() => {});
+    load();
+  </script>
+</body>
+</html>
