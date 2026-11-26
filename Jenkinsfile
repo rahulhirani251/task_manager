@@ -1,4 +1,3 @@
-// Cross-platform: Windows (bat) aur Linux/Mac (sh) dono par chalta hai
 
 def run(String cmd) {
     if (isUnix()) {
@@ -20,7 +19,6 @@ pipeline {
         timeout(time: 15, unit: 'MINUTES')
     }
 
-    // Local Jenkins ko GitHub webhook nahi mil sakta, isliye har 2 minute mein repo check hoga
     triggers {
         pollSCM('H/2 * * * *')
     }
@@ -31,6 +29,9 @@ pipeline {
 
     stages {
         stage('Build') {
+            options {
+                timeout(time: 6, unit: 'MINUTES')
+            }
             steps {
                 echo 'Dependencies install ho rahi hain...'
                 script {
@@ -39,8 +40,8 @@ pipeline {
                     } else {
                         run('python -m venv .venv')
                     }
-                    run("${venvPython()} -m pip install --upgrade pip")
-                    run("${venvPython()} -m pip install -r requirements.txt")
+                    // Timeout aur retries: network atke to build hamesha ke liye latki na rahe
+                    run("${venvPython()} -m pip install --disable-pip-version-check --default-timeout=60 --retries 5 -r requirements.txt")
                     run("${venvPython()} -m py_compile app.py")
                 }
             }
@@ -68,22 +69,13 @@ pipeline {
                     expression { env.GIT_BRANCH == 'origin/main' }
                 }
             }
+            options {
+                timeout(time: 3, unit: 'MINUTES')
+            }
             steps {
-                echo 'Deploy ho raha hai...'
+                echo 'Local deploy: app production mode mein start karke check ho rahi hai...'
                 script {
-                    try {
-                        // Jenkins > Credentials mein "Secret text", ID: render-deploy-hook
-                        withCredentials([string(credentialsId: 'render-deploy-hook', variable: 'DEPLOY_HOOK')]) {
-                            if (isUnix()) {
-                                sh 'curl -fsS -X POST "$DEPLOY_HOOK"'
-                            } else {
-                                bat 'curl -fsS -X POST "%DEPLOY_HOOK%"'
-                            }
-                        }
-                    } catch (err) {
-                        echo "Deploy hook available nahi ya fail hua: ${err.getMessage()}"
-                        currentBuild.result = 'UNSTABLE'
-                    }
+                    run("${venvPython()} deploy_check.py")
                 }
             }
         }
@@ -92,9 +84,6 @@ pipeline {
     post {
         success {
             echo 'Pipeline successful: Build, Test aur Deploy complete.'
-        }
-        unstable {
-            echo 'Build aur Test pass, lekin Deploy complete nahi hua (deploy hook check karo).'
         }
         failure {
             echo 'Pipeline fail ho gayi, console output check karo.'
